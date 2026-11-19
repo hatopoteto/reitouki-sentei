@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>冷凍機選定</title>
+<meta name="description" content="既設の冷凍機・クーラーの型式から、今の機種の組合せと能力のくらべを出す選定ソフト">
+<meta name="theme-color" content="#0b5d7a" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0e151a" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="冷凍機選定">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="format-detection" content="telephone=no">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>冷凍冷蔵の選定</h1>
+    <p class="lead">既設の型式を入れると、今の機種の組合せと、既設との能力のくらべが出ます。型式はさわると1つずつコピーできます。</p>
+  </header>
+
+  <div class="install" id="install" hidden>
+    <p><b>ホーム画面に置くと、アプリとして開けます。</b>下の共有ボタン（□に↑）→「ホーム画面に追加」。置いた後は、電波が無くても動きます。</p>
+    <button class="btn ghost small" type="button" id="installClose">閉じる</button>
+  </div>
+
+  <section class="sec" aria-labelledby="h-old">
+    <div class="sec-head"><h2 id="h-old">既設の機器</h2><p>依頼のメールにある型式を入れてください</p></div>
+    <div class="panel">
+      <form class="add" id="addForm" autocomplete="off">
+        <input id="oldInput" list="oldList" placeholder="例：OCU-NS600FS" aria-label="既設の型式" autocapitalize="characters" autocorrect="off" spellcheck="false" enterkeyhint="done">
+        <datalist id="oldList"></datalist>
+        <button class="btn" type="submit">追加</button>
+      </form>
+      <p class="msg" id="addMsg" hidden></p>
+      <div class="presets"><span>例で試す</span><div id="presets" class="presets"></div></div>
+      <ul class="olds" id="olds"></ul>
+    </div>
+  </section>
+
+  <section class="sec" aria-labelledby="h-cond">
+    <div class="sec-head"><h2 id="h-cond">条件</h2><p>能力は、庫内温度から温度差10℃で蒸発温度を置いて比べます</p></div>
+    <div class="panel">
+      <div class="cond">
+        <div class="field"><label for="troom">庫内温度</label><div class="num"><input id="troom" type="number" inputmode="numeric" step="1" min="-45" max="15"><span>℃</span></div></div>
+        <div class="field"><label for="pipe">配管の相当長</label><div class="num"><input id="pipe" type="number" inputmode="numeric" step="5" min="0" max="150"><span>m</span></div></div>
+        <div class="field"><span class="lbl" id="lbl-hz">電源</span><div class="seg" role="group" aria-labelledby="lbl-hz" id="hz"></div></div>
+        <div class="field"><span class="lbl" id="lbl-salt">塩害仕様</span><div class="seg" role="group" aria-labelledby="lbl-salt" id="salt"></div></div>
+        <div class="field" id="makerField" hidden><span class="lbl" id="lbl-maker">後継のメーカー</span><div class="seg" role="group" aria-labelledby="lbl-maker" id="maker"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec" aria-labelledby="h-res" id="resultSec">
+    <div class="sec-head"><h2 id="h-res">結論</h2></div>
+    <div class="verdict" id="verdict"></div>
+  </section>
+
+  <section class="sec" aria-labelledby="h-items" id="itemsSec">
+    <div class="sec-head"><h2 id="h-items">選んだ機器</h2></div>
+    <div class="items" id="items"></div>
+    <div class="opts" id="opts"></div>
+  </section>
+
+  <section class="sec" aria-labelledby="h-cap" id="capSec">
+    <div class="sec-head"><h2 id="h-cap">能力のくらべ</h2><p id="capCond"></p></div>
+    <div class="caps" id="caps"></div>
+  </section>
+
+  <section class="sec" aria-labelledby="h-chk" id="chkSec">
+    <div class="sec-head"><h2 id="h-chk">見積の前に確かめること</h2></div>
+    <div class="checks" id="checks"></div>
+  </section>
+
+  <footer id="footer"></footer>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div class="sheet" id="sheet" hidden>
+  <p>自動でコピーできませんでした。文字が選ばれているので、長押しでコピーしてください。</p>
+  <textarea id="sheetText" readonly aria-label="コピーする文字"></textarea>
+  <div class="btns"><button class="btn ghost small" type="button" id="sheetClose">閉じる</button></div>
+</div>
+
+<script src="data/index.js"></script>
+<script src="data/panasonic.js"></script>
+<script src="data/mitsubishi.js"></script>
+<script src="data/hitachi.js"></script>
+<script src="data/daikin.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

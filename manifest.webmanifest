@@ -1,0 +1,16 @@
+{
+  "name": "冷凍冷蔵の選定",
+  "short_name": "冷凍機選定",
+  "description": "既設の冷凍機・クーラーの型式から、今の機種の組合せと能力のくらべを出す選定ソフト",
+  "lang": "ja",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f1f5f7",
+  "theme_color": "#0b5d7a",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
