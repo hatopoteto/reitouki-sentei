@@ -1,5 +1,6 @@
 // 機種データの入れ物。メーカーごとのファイル（panasonic.js など）が SEL.add({...}) で中身を足し、最後に app.js が SEL.finish() を呼ぶ。
 // 値段・お客さんの名前は入れない（だれでも開けるURLに置くため）。
+window.APP_VERSION = "2026-11-19-2333";  // 版を上げる.mjs が書く（画面の下に出す）
 window.SEL = {
   version: "2026-11-19",
   models: {},   // 型式 → 中身

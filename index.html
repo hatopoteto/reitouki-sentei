@@ -24,6 +24,9 @@
     <p class="lead">既設の型式を入れると、今の機種の組合せと、既設との能力のくらべが出ます。型式はさわると1つずつコピーできます。</p>
   </header>
 
+  <p class="msg" id="jsErr" hidden></p>
+  <noscript><p class="msg">JavaScript が止まっているので動きません。Safari で開いてください。</p></noscript>
+
   <div class="install" id="install" hidden>
     <p><b>ホーム画面に置くと、アプリとして開けます。</b>下の共有ボタン（□に↑）→「ホーム画面に追加」。置いた後は、電波が無くても動きます。</p>
     <button class="btn ghost small" type="button" id="installClose">閉じる</button>
@@ -47,8 +50,8 @@
     <div class="sec-head"><h2 id="h-cond">条件</h2><p>能力は、庫内温度から温度差10℃で蒸発温度を置いて比べます</p></div>
     <div class="panel">
       <div class="cond">
-        <div class="field"><label for="troom">庫内温度</label><div class="num"><input id="troom" type="number" inputmode="numeric" step="1" min="-45" max="15"><span>℃</span></div></div>
-        <div class="field"><label for="pipe">配管の相当長</label><div class="num"><input id="pipe" type="number" inputmode="numeric" step="5" min="0" max="150"><span>m</span></div></div>
+        <div class="field"><label for="troom">庫内温度</label><div class="num"><button type="button" class="step" data-step="troom:-1" aria-label="1℃下げる">−</button><input id="troom" type="text" inputmode="text" pattern="-?[0-9]*" autocomplete="off"><button type="button" class="step" data-step="troom:1" aria-label="1℃上げる">＋</button><span>℃</span></div></div>
+        <div class="field"><label for="pipe">配管の相当長</label><div class="num"><button type="button" class="step" data-step="pipe:-5" aria-label="5m減らす">−</button><input id="pipe" type="number" inputmode="numeric" step="5" min="0" max="150"><button type="button" class="step" data-step="pipe:5" aria-label="5m増やす">＋</button><span>m</span></div></div>
         <div class="field"><span class="lbl" id="lbl-hz">電源</span><div class="seg" role="group" aria-labelledby="lbl-hz" id="hz"></div></div>
         <div class="field"><span class="lbl" id="lbl-salt">塩害仕様</span><div class="seg" role="group" aria-labelledby="lbl-salt" id="salt"></div></div>
         <div class="field" id="makerField" hidden><span class="lbl" id="lbl-maker">後継のメーカー</span><div class="seg" role="group" aria-labelledby="lbl-maker" id="maker"></div></div>
@@ -86,6 +89,14 @@
   <div class="btns"><button class="btn ghost small" type="button" id="sheetClose">閉じる</button></div>
 </div>
 
+<script>
+  // つまずいたら、その理由を画面の上に出す（写真に撮って送ってもらう）
+  window.addEventListener("error", function (e) {
+    var b = document.getElementById("jsErr"); if (!b) return;
+    b.hidden = false;
+    b.textContent = "うまく動きませんでした。この画面を写真に撮って送ってください：" + (e.message || "") + "（" + String(e.filename || "").split("/").pop() + ":" + (e.lineno || "") + "）／" + navigator.userAgent;
+  });
+</script>
 <script src="data/index.js"></script>
 <script src="data/panasonic-reitouki.js"></script>
 <script src="data/panasonic.js"></script>

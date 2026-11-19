@@ -281,7 +281,7 @@
       const list = SEL.sources[mk] || [];
       return `<li><b>${esc(mk)}</b>（${count(mk)} 型式）${list.length ? "：" + list.map(esc).join("／") : "：まだ入っていません"}</li>`;
     }).join("");
-    $("footer").innerHTML = `<p>データ ${esc(SEL.version)} 版。値段・お客さんの名前は入っていません。能力はメーカーの仕様書・能力表の値で、最後はメーカーに確かめてください。</p><ul>${src}</ul>`;
+    $("footer").innerHTML = `<p>データ ${esc(SEL.version)} 版（アプリ ${esc(window.APP_VERSION || "")}）。値段・お客さんの名前は入っていません。能力はメーカーの仕様書・能力表の値で、最後はメーカーに確かめてください。</p><ul>${src}</ul>`;
   }
 
   // ───── コピー ─────
@@ -323,13 +323,18 @@
 
   $("oldList").innerHTML = Object.keys(SUCC).filter((k) => M[k]).sort().map((k) => `<option value="${esc(k)}">${esc(M[k].maker + "・" + M[k].kind)}</option>`).join("");
   $("addForm").addEventListener("submit", (e) => { e.preventDefault(); if (addOld($("oldInput").value)) { $("oldInput").value = ""; $("oldInput").blur(); } });
-  $("troom").addEventListener("input", (e) => { const v = parseFloat(e.target.value); if (!isNaN(v)) { S.troom = Math.max(-45, Math.min(15, v)); S.preset = ""; render(); } });
+  $("troom").addEventListener("input", (e) => { const v = parseFloat(norm(e.target.value)); if (!isNaN(v)) { S.troom = Math.max(-45, Math.min(15, v)); S.preset = ""; render(); } });
   $("pipe").addEventListener("input", (e) => { const v = parseFloat(e.target.value); if (!isNaN(v)) { S.pipe = Math.max(0, Math.min(150, v)); S.preset = ""; render(); } });
   $("sheetClose").addEventListener("click", () => { $("sheet").hidden = true; });
   document.addEventListener("click", (e) => {
     const t = e.target.closest("button, input[type=checkbox]"); if (!t) return;
     const d = t.dataset;
-    if (d.preset) loadPreset(d.preset);
+    if (d.step) {
+      const [key, by] = d.step.split(":"); const lim = key === "troom" ? [-45, 15] : [0, 150];
+      S[key] = Math.max(lim[0], Math.min(lim[1], S[key] + Number(by))); S.preset = "";
+      $(key).value = S[key]; render();
+    }
+    else if (d.preset) loadPreset(d.preset);
     else if (d.inc) { S.olds[+d.inc].qty++; render(); }
     else if (d.dec) { const o = S.olds[+d.dec]; if (o.qty > 1) { o.qty--; render(); } }
     else if (d.del) { S.olds.splice(+d.del, 1); S.preset = ""; render(); }
@@ -348,13 +353,16 @@
   if (isIOS && navigator.standalone === false && !dismissed) $("install").hidden = false;
   $("installClose").addEventListener("click", () => { $("install").hidden = true; try { localStorage.setItem("install-dismissed", "1"); } catch (e) {} });
 
-  // 電波が無くても動くように（公開した置き場の上でだけ）
-  if ("serviceWorker" in navigator && location.protocol === "https:") {
-    navigator.serviceWorker.register("sw.js").catch(() => {});
-    let had = !!navigator.serviceWorker.controller;
-    navigator.serviceWorker.addEventListener("controllerchange", () => { if (had) toast("新しい版になりました"); had = true; });
-  }
-
   renderFooter();
   if (!restore() || !S.olds.length) loadPreset(PRESETS[0] ? PRESETS[0].id : ""); else render();
+
+  // 電波が無くても動くように（公開した置き場の上でだけ。LINE の中のブラウザなど、使えない所では飛ばす）
+  try {
+    if ("serviceWorker" in navigator && navigator.serviceWorker && location.protocol === "https:") {
+      const sw = navigator.serviceWorker;
+      Promise.resolve().then(() => sw.register("sw.js")).catch(() => {});
+      let had = !!sw.controller;
+      sw.addEventListener("controllerchange", () => { if (had) toast("新しい版になりました"); had = true; });
+    }
+  } catch (e) { /* 使えない所では、電波ありの時だけ動く */ }
 })();

@@ -1,6 +1,6 @@
 // 電波が無くても動くように、アプリのファイルを iPhone の中にしまっておく。
 // 中身を変えたら `node 版を上げる.mjs` で VERSION を上げる（上げないと、iPhone は古いまま）。
-const VERSION = "2026-11-19-2316";
+const VERSION = "2026-11-19-2333";
 const FILES = [
   "./",
   "index.html",

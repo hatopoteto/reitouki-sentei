@@ -23,7 +23,7 @@ sw = sw.replace(/const FILES = \[[\s\S]*?\];/, `const FILES = [\n${files.map((f)
 fs.writeFileSync(swPath, sw);
 
 const idxPath = path.join(here, "data", "index.js");
-fs.writeFileSync(idxPath, fs.readFileSync(idxPath, "utf8").replace(/version: "[^"]*"/, `version: "${day}"`));
+fs.writeFileSync(idxPath, fs.readFileSync(idxPath, "utf8").replace(/version: "[^"]*"/, `version: "${day}"`).replace(/window\.APP_VERSION = "[^"]*"/, `window.APP_VERSION = "${ver}"`));
 
 // index.html が読むデータのファイルが、data/ の中身と合っているか
 const html = fs.readFileSync(path.join(here, "index.html"), "utf8");
