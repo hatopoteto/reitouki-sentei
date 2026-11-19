@@ -1,6 +1,6 @@
 // 冷凍冷蔵の選定：既設の型式 → 後継の組合せ・能力のくらべ・確かめること
 (() => {
-  const SEL = window.SEL; const M = SEL.models; const SUCC = SEL.succ;
+  const SEL = window.SEL; SEL.finish(); const M = SEL.models; const SUCC = SEL.succ;
   const KIND_ORDER = ["冷凍機", "クーラー", "吸込みフード", "吹出しダンパー", "コントローラー", "フィルター", "膨張弁", "電磁弁", "警報"];
   // 例（お客さんの名前は入れない）
   const PRESETS = [
@@ -36,29 +36,37 @@
     return y0 + (y1 - y0) * (x - x0) / (x1 - x0);
   }
   function ucCap(id, td) { const u = M[id].uc; const t = (S.hz === 60 && u.td60) ? u.td60 : u.td; return lerp(t, td); }
-  // 冷凍機の能力：表（配管長別）か、2点以上の線。どちらも無ければ null
+  // 冷凍機の能力を蒸発温度 te で読む。2点以上の表が無ければ null
+  //   table … 配管長別の表（三菱など）／ rows … 蒸発温度ごとの表。cols: hz=50Hz・60Hz、range=定格〜最大（インバーター）、single=最大運転の1列
   function cuCurve(id, te) {
     const c = M[id].cu || {};
+    const out = (tes) => te < Math.min(...tes) - 0.01 || te > Math.max(...tes) + 0.01;
     if (c.table) {
       const t = c.table; const L = S.pipe; const Lc = Math.min(Math.max(L, t.L[0]), t.L[t.L.length - 1]);
       const pts = t.rows.map((r) => [r.te, lerp(t.L.map((l, i) => [l, r.kw[i]]), Lc)]);
-      const tes = pts.map((p) => p[0]);
-      return { kw: lerp(pts, te), outside: te < Math.min(...tes) - 0.01 || te > Math.max(...tes) + 0.01, clamped: L !== Lc };
+      return { kw: lerp(pts, te), outside: out(pts.map((p) => p[0])), clamped: L !== Lc };
     }
-    if (c.curve && c.curve.length >= 2) {
-      const tes = c.curve.map((p) => p[0]);
-      return { kw: lerp(c.curve, te), outside: te < Math.min(...tes) - 0.01 || te > Math.max(...tes) + 0.01 };
+    if (c.rows && c.rows.length >= 2) {
+      const tes = c.rows.map((r) => r[0]);
+      const col = (i) => lerp(c.rows.map((r) => [r[0], r[i]]), te);
+      if (c.cols === "hz") return { kw: col(S.hz === 60 ? 2 : 1), outside: out(tes) };
+      if (c.cols === "range") return { kw: col(1), max: col(2), outside: out(tes) };
+      return { kw: col(1), outside: out(tes) };
     }
     return null;
   }
-  function balance(cuId, ucId, n) {
-    const f = (te) => cuCurve(cuId, te).kw - n * ucCap(ucId, S.troom - te);
+  // 冷凍機とクーラーが釣り合う蒸発温度。which=max ならインバーターの最大側で
+  function balance(cuId, ucId, n, which) {
+    const q = (te) => { const v = cuCurve(cuId, te); return which === "max" && v.max ? v.max : v.kw; };
+    const f = (te) => q(te) - n * ucCap(ucId, S.troom - te);
     let lo = -50, hi = S.troom - 0.5;
     if (!(f(lo) * f(hi) <= 0)) return null;
     for (let i = 0; i < 60; i++) { const mid = (lo + hi) / 2; if (f(lo) * f(mid) <= 0) hi = mid; else lo = mid; }
     const te = (lo + hi) / 2;
     return { te, td: S.troom - te, kw: n * ucCap(ucId, S.troom - te), outside: cuCurve(cuId, te).outside };
   }
+  // いちばん出せる能力（インバーターは最大側）
+  const topKw = (v) => (v.max || v.kw);
 
   // ───── 組合せを作る ─────
   function pickSucc(old) {
@@ -76,8 +84,24 @@
     const out = [];
     const put = (row) => { const e = out.find((r) => r.model === row.model); if (e) { e.qty = Math.max(e.qty, row.qty); e.old = e.old || row.old; } else out.push(row); };
     S.olds.forEach((o) => {
-      const m = pickSucc(o.model); if (!m) return;
-      put({ model: m, old: o.model, qty: o.qty });
+      let m = pickSucc(o.model); if (!m) return;
+      // 冷凍機：同じ馬力で能力が既設に届かない時は、同じ並びの1つ上へ（3つまで）
+      let stepped = null;
+      if (M[m].kind === "冷凍機" && m !== o.model) {
+        const te = S.troom - 10; const ov = cuCurve(o.model, te);
+        const base0 = M[m].saltOf || m; const line = SEL.lineOf[base0];
+        if (ov && line) {
+          let base = base0; let i = line.i;
+          for (let k = 0; k < 3; k++) {
+            const nv = cuCurve(base, te);
+            if (!nv || topKw(nv) + 1e-9 >= topKw(ov)) break;
+            const next = SEL.lineups[line.name][i + 1]; if (!next) break;
+            base = next; i++;
+          }
+          if (base !== base0) { stepped = base0; m = (S.salt && M[base].salt && M[M[base].salt]) ? M[base].salt : base; }
+        }
+      }
+      put({ model: m, old: o.model, qty: o.qty, stepped });
       const base = M[m].saltOf || m;
       (M[base].addons || []).forEach((a) => { if (M[a.m]) put({ model: a.m, old: null, qty: a.per === "unit" ? o.qty : 1 }); });
     });
@@ -93,7 +117,7 @@
     const c = M[id].cu;
     if (!c || c.unknown) return { unknown: true };
     const v = cuCurve(id, te);
-    if (v) return { kw: v.kw, note: c.cond + (v.outside ? "。この蒸発温度は表の外なので、直線でのばした値" : "") + (v.clamped ? "。配管長は表の端の値" : "") };
+    if (v) return { kw: v.kw, max: v.max, note: c.cond + (c.label ? `（${c.label}）` : "") + (v.outside ? "。この蒸発温度は表の外なので、直線でのばした値" : "") + (v.clamped ? "。配管長は表の端の値" : "") };
     if (c.point.te === te) return { kw: c.point.kw, max: c.point.kwMax, note: c.cond };
     return { kw: c.point.kw, max: c.point.kwMax, other: true, note: c.cond };
   }
@@ -117,10 +141,20 @@
       else if (vo.unknown) { row.state = "warn"; row.notes.push(`既設 ${cuOld.model} の能力が分かりません。メーカーへの照会で確かめます`); }
       else if (vn.unknown) { row.state = "warn"; row.notes.push(`${cuNew.model} の能力が入っていません`); }
       else if (vo.other || vn.other) { row.state = "warn"; row.notes.push(`仕様書の値が、庫内 ${S.troom}℃（蒸発 ${te}℃）とは別の条件です。くらべるには、同じ条件の値が要ります`); }
-      else if ((vn.max || vn.kw) + 1e-9 < vo.kw) { row.state = "bad"; row.notes.push("新の能力が既設を下回ります"); }
+      else if (topKw(vn) + 1e-9 < topKw(vo)) { row.state = "bad"; row.notes.push("新の能力が既設を下回ります"); }
+      else if (vn.max && vn.kw + 1e-9 < topKw(vo)) {
+        row.state = "warn";
+        const line = SEL.lineOf[M[cuNew.model].saltOf || cuNew.model]; const next = line && SEL.lineups[line.name][line.i + 1];
+        row.notes.push(`既設の能力に届くのは、インバーターの最大側だけです（定格側は ${kw(vn.kw)} kW）。${next ? `余裕を見るなら、1つ上の ${next} も候補です` : "余裕は少なめです"}`);
+      }
       const m = M[cuNew.model];
+      if (cuNew.stepped) row.notes.push(`同じ馬力の ${cuNew.stepped} では既設の能力に届かないので、1つ上の ${cuNew.model} にしました`);
       if (m.pipeMax && S.pipe > m.pipeMax) { row.state = "bad"; row.notes.push(`配管 ${S.pipe}m は最大配管長 ${m.pipeMax}m を超えています`); }
-      if (cuCurve(cuNew.model, te) && ucNew && M[ucNew.model].uc) row.balance = balance(cuNew.model, ucNew.model, ucNew.qty);
+      if (m.te && (te < m.te[0] || te > m.te[1])) { row.state = "bad"; row.notes.push(`蒸発 ${te}℃ は ${cuNew.model} の蒸発温度範囲（${m.te[0]}〜${m.te[1]}℃）の外です`); }
+      if (cuCurve(cuNew.model, te) && ucNew && M[ucNew.model].uc) {
+        row.balance = balance(cuNew.model, ucNew.model, ucNew.qty, "kw");
+        if (vn.max && row.balance) row.balanceMax = balance(cuNew.model, ucNew.model, ucNew.qty, "max");
+      }
       worse(row.state); res.rows.push(row);
     }
     if (ucNew && M[ucNew.model].uc) {
@@ -149,6 +183,14 @@
       if (m.flag === "要確認" && m.memo) add(m.maker, `${r.model}：${m.memo}`);
       if (m.pipeTableMax && S.pipe > m.pipeTableMax) add(m.maker, `配管 ${S.pipe}m 相当で ${r.model} が使えるか。施工説明書の表は配管長 ${m.pipeTableMax}m まで`);
       if (!S.salt && m.salt && M[m.salt]) add("依頼元", `現場が海の近くなら、塩害仕様（${m.salt}）にするか`);
+      // 既設と配管の接続径が違う時
+      const om = r.old && r.old !== r.model ? M[r.old] : null;
+      if (om && om.pipe && m.pipe && (om.pipe.gas !== m.pipe.gas || om.pipe.liq !== m.pipe.liq)) {
+        const d = [];
+        if (om.pipe.gas !== m.pipe.gas) d.push(`吸入 φ${om.pipe.gas} → φ${m.pipe.gas}`);
+        if (om.pipe.liq !== m.pipe.liq) d.push(`液 φ${om.pipe.liq} → φ${m.pipe.liq}`);
+        add("依頼元", `${r.model} は配管の接続径が既設と違います（${d.join("、")}）。異径継手で合わせるか、既設の配管サイズを確かめる`);
+      }
     });
     S.olds.forEach((o) => { const c = M[o.model].cu; if (c && c.unknown) add(`${M[o.model].maker}（既設のメーカー）`, `既設 ${o.model} の能力（同等かの裏付け）`); });
     const groups = {};
@@ -201,7 +243,7 @@
         <button type="button" class="model" data-copytext="${esc(r.model)}">${esc(r.model)}</button>
         ${r.old && !same ? `<p class="from">既設 ${esc(r.old)} から</p>` : ""}
         ${m.desc ? `<p class="desc">${esc(m.desc)}</p>` : ""}
-        ${m.pipe ? `<p class="memo">配管接続 ${esc(m.pipe)}</p>` : ""}
+        ${m.pipe ? `<p class="memo">配管接続 吸入 φ${esc(m.pipe.gas)}・液 φ${esc(m.pipe.liq)}${m.size ? `／外形 ${esc(m.size)}（高さ×幅×奥行）` : ""}${m.mass ? `・${esc(m.mass)}` : ""}</p>` : ""}
         ${m.memo ? `<p class="memo">${esc(m.memo)}</p>` : ""}
       </article>`;
     }).join("");
@@ -219,7 +261,10 @@
         return `<div class="bar ${b.isNew ? "new" : ""}"><span>${b.who}${b.est ? "（推定）" : ""}</span><div class="track" title="${esc(b.model)}"><div class="fill" style="width:${w}%"></div>${b.max ? `<div class="range" style="width:${wr}%"></div>` : ""}</div><b>${kw(b.kw)}${b.max ? "〜" + kw(b.max) : ""} kW</b></div>`;
       }).join("");
       const conds = row.cond ? [row.cond] : row.bars.filter((b) => b.note).map((b) => `${b.who} ${b.model}：${b.note}`);
-      const bal = row.balance ? `<p class="balance">クーラーと合わせると、蒸発 <b>${row.balance.te.toFixed(1)}℃</b>（温度差 <b>${row.balance.td.toFixed(1)}K</b>）で <b>${kw(row.balance.kw)} kW</b> で釣り合います${row.balance.outside ? "（能力表の外を直線でのばした値）" : ""}。</p>` : "";
+      const b1 = row.balance, b2 = row.balanceMax;
+      const bal = !b1 ? "" : b2
+        ? `<p class="balance">クーラーと合わせると、蒸発 <b>${b1.te.toFixed(1)}〜${b2.te.toFixed(1)}℃</b>（温度差 <b>${b1.td.toFixed(1)}〜${b2.td.toFixed(1)}K</b>）で <b>${kw(b1.kw)}〜${kw(b2.kw)} kW</b> で釣り合います（インバーターの定格側〜最大側）${b1.outside || b2.outside ? "。能力表の外を直線でのばした値を含みます" : ""}。</p>`
+        : `<p class="balance">クーラーと合わせると、蒸発 <b>${b1.te.toFixed(1)}℃</b>（温度差 <b>${b1.td.toFixed(1)}K</b>）で <b>${kw(b1.kw)} kW</b> で釣り合います${b1.outside ? "（能力表の外を直線でのばした値）" : ""}。</p>`;
       return `<div class="cap"><h3>${row.title}<span class="pill ${pill[0]}">${pill[1]}</span></h3><div class="bars">${bars}</div>${bal}
         ${row.notes.map((n) => `<p class="why">${esc(n)}</p>`).join("")}
         ${conds.map((c) => `<p class="cond-note">${esc(c)}</p>`).join("")}</div>`;

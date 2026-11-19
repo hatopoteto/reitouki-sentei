@@ -1,17 +1,18 @@
 // 電波が無くても動くように、アプリのファイルを iPhone の中にしまっておく。
 // 中身を変えたら `node 版を上げる.mjs` で VERSION を上げる（上げないと、iPhone は古いまま）。
-const VERSION = "2026-11-19-1";
+const VERSION = "2026-11-19-2316";
 const FILES = [
   "./",
   "index.html",
   "style.css",
   "app.js",
   "manifest.webmanifest",
-  "data/index.js",
-  "data/panasonic.js",
-  "data/mitsubishi.js",
-  "data/hitachi.js",
   "data/daikin.js",
+  "data/hitachi.js",
+  "data/index.js",
+  "data/mitsubishi.js",
+  "data/panasonic-reitouki.js",
+  "data/panasonic.js",
   "icons/icon-180.png",
   "icons/icon-192.png",
   "icons/icon-512.png"
